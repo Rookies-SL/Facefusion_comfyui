@@ -88,13 +88,14 @@ class SwapFaceImage:
 		return (output_tensor,)
 
 	@staticmethod
-	def swap_face(source_tensor : Tensor, target_tensor : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, pixel_boost: str = '512x512', face_mask_blur: float = 0.3, face_occluder_model: Optional[str] = None, face_parser_model: Optional[str] = None, face_selector_mode: str = 'one', face_position: int = 0, sort_order: str = 'large-small', score_threshold: float = 0.3, face_detector_model: str = 'scrfd', face_mask_types: Optional[list] = None, face_mask_areas: Optional[list] = None, face_mask_regions: Optional[list] = None, face_mask_padding: tuple = (0, 0, 0, 0), enable_nsfw_check: bool = True) -> Tensor:
+	def swap_face(source_tensor : Tensor, target_tensor : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, pixel_boost: str = '512x512', face_mask_blur: float = 0.3, face_occluder_model: Optional[str] = None, face_parser_model: Optional[str] = None, face_selector_mode: str = 'one', face_position: int = 0, sort_order: str = 'large-small', score_threshold: float = 0.3, face_detector_model: str = 'scrfd', face_mask_types: Optional[list] = None, face_mask_areas: Optional[list] = None, face_mask_regions: Optional[list] = None, face_mask_padding: tuple = (0, 0, 0, 0), enable_nsfw_check: bool = True, source_face: Optional[Dict[str, Any]] = None, source_cv2: Optional[Any] = None) -> Tensor:
 		# Check if using local inference
 		if api_token == '-1':
 			# print("[SwapFaceImage] Using local inference")
 			try:
 				# Convert tensors to OpenCV format
-				source_cv2 = tensor_to_cv2(source_tensor)
+				if source_cv2 is None:
+					source_cv2 = tensor_to_cv2(source_tensor)
 				target_cv2 = tensor_to_cv2(target_tensor)
 				
 				if enable_nsfw_check and CONTENT_FILTER_AVAILABLE:
@@ -125,7 +126,8 @@ class SwapFaceImage:
 					face_mask_types=face_mask_types,
 					face_mask_areas=face_mask_areas,
 					face_mask_regions=face_mask_regions,
-					face_mask_padding=face_mask_padding
+					face_mask_padding=face_mask_padding,
+					source_face=source_face
 				)
 				
 				# Convert back to tensor

@@ -1,8 +1,11 @@
 import importlib
+import inspect
 import sys
 import types
 from pathlib import Path
 from unittest import TestCase
+
+import torch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,3 +109,77 @@ class NsfwToggleTest(TestCase):
 
 		self.assertEqual(result, 'tensor:swapped-cv2')
 		self.assertEqual(len(calls), 1)
+
+	def test_video_precheck_disables_repeated_frame_nsfw_analysis(self) -> None:
+		install_stub_modules()
+		sys.modules.pop('facefusion_api.nodes.base', None)
+		sys.modules.pop('facefusion_api.nodes.image_nodes', None)
+		sys.modules.pop('facefusion_api.nodes.video_nodes', None)
+		video_nodes = importlib.import_module('facefusion_api.nodes.video_nodes')
+		swap_calls = []
+		analyse_calls = []
+
+		class FakeVideoComponents:
+			def __init__(self, images, audio=None, frame_rate=30):
+				self.images = images
+				self.audio = audio
+				self.frame_rate = frame_rate
+
+		class FakeVideo:
+			def __init__(self, components):
+				self.components = components
+
+			def get_components(self):
+				return self.components
+
+		def fake_swap_face(source_tensor, target_tensor, **kwargs):
+			swap_calls.append(kwargs)
+			return torch.zeros((1, 2, 2, 3))
+
+		video_nodes.VideoComponents = FakeVideoComponents
+		video_nodes.VideoFromComponents = FakeVideo
+		video_nodes.tensor_to_cv2 = lambda tensor: tensor
+		video_nodes.analyse_frame = lambda frame: analyse_calls.append(frame) or False
+		video_nodes.SwapFaceImage.swap_face = staticmethod(fake_swap_face)
+
+		frames = torch.zeros((3, 2, 2, 3))
+		source = torch.zeros((1, 2, 2, 3))
+		target_video = FakeVideo(FakeVideoComponents(frames))
+
+		video_nodes.SwapFaceVideo.process(
+			source,
+			target_video,
+			'-1',
+			'hyperswap_1c_256',
+			'scrfd',
+			1,
+			True
+		)
+
+		self.assertEqual(len(analyse_calls), 4)
+		self.assertEqual(len(swap_calls), 3)
+		self.assertTrue(all(call['enable_nsfw_check'] is False for call in swap_calls))
+
+	def test_video_nodes_default_to_conservative_worker_count(self) -> None:
+		install_stub_modules()
+		sys.modules.pop('facefusion_api.nodes.base', None)
+		sys.modules.pop('facefusion_api.nodes.image_nodes', None)
+		sys.modules.pop('facefusion_api.nodes.video_nodes', None)
+		video_nodes = importlib.import_module('facefusion_api.nodes.video_nodes')
+
+		self.assertEqual(
+			video_nodes.SwapFaceVideo.INPUT_TYPES()['required']['max_workers'][1]['default'],
+			4
+		)
+		self.assertEqual(
+			video_nodes.AdvancedSwapFaceVideo.INPUT_TYPES()['required']['max_workers'][1]['default'],
+			4
+		)
+		self.assertEqual(
+			inspect.signature(video_nodes.SwapFaceVideo.process).parameters['max_workers'].default,
+			4
+		)
+		self.assertEqual(
+			inspect.signature(video_nodes.AdvancedSwapFaceVideo.process).parameters['max_workers'].default,
+			4
+		)

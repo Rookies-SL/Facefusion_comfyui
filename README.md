@@ -159,7 +159,7 @@ Source → Face Swap Applier → Preview
 ### Video Swap
 ```
 Source Image → Advanced Swap Video ← Target Video
-             (max_workers: 8)
+             (max_workers: 4)
                     ↓
                Save Video
 ```
@@ -181,6 +181,8 @@ All image swapper nodes **automatically detect and handle**:
 ### For Speed
 - Model: `inswapper_128_fp16`
 - Pixel Boost: `256x256` or `512x512`
+- Mask Types: Box only
+- NSFW Check: disable only for trusted local inputs
 - GPU with CUDA enabled
 
 ### For Quality
@@ -191,7 +193,8 @@ All image swapper nodes **automatically detect and handle**:
 ### For Video
 - Model: `hyperswap_1c_256`
 - Pixel Boost: `512x512`
-- Max Workers: `4-8`
+- Max Workers: `4` default; increase carefully if GPU memory and ONNX runtime stay stable
+- Source face detection is cached per video run; keep one clear source face for best speed
 
 ---
 
@@ -211,6 +214,7 @@ All image swapper nodes **automatically detect and handle**:
 - Enable GPU/CUDA
 - Use faster model (`inswapper_128_fp16`)
 - Lower pixel boost resolution
+- Keep `max_workers` around `2-4` for GPU workloads before trying higher values
 
 ### Models Won't Download
 - Check internet connection

@@ -52,7 +52,7 @@ class SwapFaceVideo:
 				(
 					'INT',
 					{
-						'default': 16,
+						'default': 4,
 						'min': 1,
 						'max': 32
 					}
@@ -72,13 +72,18 @@ class SwapFaceVideo:
 	CATEGORY = 'FaceFusion API'
 
 	@staticmethod
-	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int, enable_nsfw_check: bool = True) -> Tuple[VideoFromComponents]:
+	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int = 4, enable_nsfw_check: bool = True) -> Tuple[VideoFromComponents]:
 		try:
 			# Handle multiple source images by taking the first one
 			if source_images.dim() == 4 and source_images.shape[0] > 1:
 				source_image = source_images[0:1]
 			else:
 				source_image = source_images
+
+			source_cv2 = None
+			source_face = None
+			if api_token == '-1':
+				source_cv2 = tensor_to_cv2(source_image)
 				
 			# Get video components with error handling
 			try:
@@ -98,7 +103,6 @@ class SwapFaceVideo:
 			
 			# Check source image for NSFW content (only if using local inference)
 			if api_token == '-1' and enable_nsfw_check and CONTENT_FILTER_AVAILABLE:
-				source_cv2 = tensor_to_cv2(source_image)
 				if analyse_frame(source_cv2):
 					print("[ContentFilter] NSFW source detected in video - returning blurred video")
 					# Blur all frames
@@ -144,8 +148,14 @@ class SwapFaceVideo:
 						frame_rate = video_components.frame_rate
 					)
 					return (VideoFromComponents(output_video_components),)
+
+			if api_token == '-1':
+				source_faces = detect_faces(source_cv2, 0.3, 'large-small', face_detector_model)
+				if source_faces:
+					source_face = source_faces[0]
 			
 			output_tensors = []
+			frame_enable_nsfw_check = False if api_token == '-1' else enable_nsfw_check
 
 			swap_face = partial(
 				SwapFaceImage.swap_face,
@@ -153,7 +163,9 @@ class SwapFaceVideo:
 				api_token = api_token,
 				face_swapper_model = face_swapper_model,
 				face_detector_model = face_detector_model,
-				enable_nsfw_check = enable_nsfw_check
+				enable_nsfw_check = frame_enable_nsfw_check,
+				source_face = source_face,
+				source_cv2 = source_cv2
 			)
 
 			with ThreadPoolExecutor(max_workers = max_workers) as executor:
@@ -350,7 +362,7 @@ class AdvancedSwapFaceVideo:
 				(
 					'INT',
 					{
-						'default': 16,
+						'default': 4,
 						'min': 1,
 						'max': 32
 					}
@@ -405,7 +417,7 @@ class AdvancedSwapFaceVideo:
 		face_mask_areas: str = 'upper-face,lower-face,mouth',
 		face_mask_regions: str = 'skin,nose,mouth,upper-lip,lower-lip',
 		face_mask_padding: str = '0,0,0,0',
-		max_workers: int = 16,
+		max_workers: int = 4,
 		enable_nsfw_check: bool = True,
 		reference_image: Optional[Tensor] = None,
 		reference_face_distance: float = 0.6
@@ -440,6 +452,11 @@ class AdvancedSwapFaceVideo:
 				source_image = source_images[0:1]
 			else:
 				source_image = source_images
+
+			source_cv2 = None
+			source_face = None
+			if api_token == '-1':
+				source_cv2 = tensor_to_cv2(source_image)
 			
 			# Get video components with error handling
 			try:
@@ -459,7 +476,6 @@ class AdvancedSwapFaceVideo:
 			
 			# Check source image for NSFW content (only if using local inference)
 			if api_token == '-1' and enable_nsfw_check and CONTENT_FILTER_AVAILABLE:
-				source_cv2 = tensor_to_cv2(source_image)
 				if analyse_frame(source_cv2):
 					print("[ContentFilter] NSFW source detected in video - returning blurred video")
 					blurred_frames = []
@@ -504,8 +520,14 @@ class AdvancedSwapFaceVideo:
 						frame_rate = video_components.frame_rate
 					)
 					return (VideoFromComponents(output_video_components),)
+
+			if api_token == '-1':
+				source_faces = detect_faces(source_cv2, score_threshold, sort_order, face_detector_model)
+				if source_faces:
+					source_face = source_faces[min(face_position, len(source_faces) - 1)]
 			
 			output_tensors = []
+			frame_enable_nsfw_check = False if api_token == '-1' else enable_nsfw_check
 
 			swap_face = partial(
 				SwapFaceImage.swap_face,
@@ -525,7 +547,9 @@ class AdvancedSwapFaceVideo:
 				face_mask_areas = mask_areas,
 				face_mask_regions = mask_regions,
 				face_mask_padding = padding,
-				enable_nsfw_check = enable_nsfw_check
+				enable_nsfw_check = frame_enable_nsfw_check,
+				source_face = source_face,
+				source_cv2 = source_cv2
 			)
 
 			with ThreadPoolExecutor(max_workers = max_workers) as executor:

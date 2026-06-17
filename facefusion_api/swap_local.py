@@ -3,7 +3,7 @@ Local face swapping main function.
 """
 from typing import Optional, List, Tuple
 
-from .utils import VisionFrame
+from .utils import VisionFrame, Face
 from .detection.detector import detect_faces
 from .models import get_local_swapper, get_face_occluder, get_face_parser
 
@@ -24,7 +24,8 @@ def swap_faces_local(
     face_mask_types: Optional[List[str]] = None,
     face_mask_areas: Optional[List[str]] = None,
     face_mask_regions: Optional[List[str]] = None,
-    face_mask_padding: Tuple[int, int, int, int] = (0, 0, 0, 0)
+    face_mask_padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
+    source_face: Optional[Face] = None
 ) -> VisionFrame:
     """
     Swap faces locally using ONNX models.
@@ -46,6 +47,7 @@ def swap_faces_local(
         face_mask_areas: List of face areas for area mask ['upper-face', 'lower-face', 'mouth']
         face_mask_regions: List of face regions for region mask ['skin', 'nose', 'mouth', etc.]
         face_mask_padding: Padding for box mask (top, right, bottom, left)
+        source_face: Precomputed source face for video/batch paths to avoid repeated source detection
     
     Returns:
         Image with swapped faces
@@ -56,19 +58,19 @@ def swap_faces_local(
     # print(f"[LocalSwap] Starting local face swap with model: {model_name}")
     
     # Detect faces in source and target
-    source_faces = detect_faces(source_image, score_threshold, sort_order, face_detector_model)
+    if source_face is None:
+        source_faces = detect_faces(source_image, score_threshold, sort_order, face_detector_model)
+        if not source_faces:
+            # print("[LocalSwap] No faces detected in source image")
+            return target_image
+        source_face = source_faces[min(face_position, len(source_faces) - 1)]
+
     target_faces = detect_faces(target_image, score_threshold, sort_order, face_detector_model)
-    
-    if not source_faces:
-        # print("[LocalSwap] No faces detected in source image")
-        return target_image
     
     if not target_faces:
         # print("[LocalSwap] No faces detected in target image")
         return target_image
-    
-    # Select source face
-    source_face = source_faces[min(face_position, len(source_faces) - 1)]
+
     # print(f"[LocalSwap] Using source face at position {face_position}")
     
     # Get swapper
@@ -106,4 +108,3 @@ def swap_faces_local(
     
     # print("[LocalSwap] Face swap completed")
     return result
-
