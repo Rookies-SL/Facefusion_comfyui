@@ -10,6 +10,7 @@ import numpy as np
 import onnxruntime as ort
 from numpy.typing import NDArray
 
+from ..ort_utils import log_onnx_session
 from ..utils import (
     VisionFrame, BoundingBox, FaceLandmark5, Face,
     create_face_dict, sort_faces_by_order, select_face_by_position,
@@ -60,6 +61,8 @@ class FaceDetector:
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
             self.detector_session = ort.InferenceSession(detector_path, providers=providers)
             self.recognition_session = ort.InferenceSession(recognition_path, providers=providers)
+            log_onnx_session(f'FaceDetector:{self.detector_model_name}', providers, self.detector_session)
+            log_onnx_session(f'FaceRecognizer:{self.recognition_model_name}', providers, self.recognition_session)
             
             print(f"Face detector initialized successfully")
             return True

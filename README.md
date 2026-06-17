@@ -215,6 +215,7 @@ All image swapper nodes **automatically detect and handle**:
 - Use faster model (`inswapper_128_fp16`)
 - Lower pixel boost resolution
 - Keep `max_workers` around `2-4` for GPU workloads before trying higher values
+- Set `FACEFUSION_ONNX_DEBUG=1` before starting ComfyUI to print ONNX provider diagnostics
 
 ### Models Won't Download
 - Check internet connection

@@ -11,6 +11,20 @@ import inspect
 from typing import Optional, Tuple, Dict, Any
 import onnxruntime as ort
 
+try:
+    from facefusion_api.ort_utils import log_onnx_session
+except Exception:
+    def log_onnx_session(label, requested_providers, session):
+        if os.environ.get('FACEFUSION_ONNX_DEBUG', '').strip().lower() not in {'1', 'true', 'yes', 'on'}:
+            return
+        try:
+            available_providers = ort.get_available_providers()
+        except Exception as e:
+            available_providers = [f'unavailable: {e}']
+        print(f"[ONNXRuntime][{label}] available providers: {available_providers}")
+        print(f"[ONNXRuntime][{label}] requested providers: {requested_providers}")
+        print(f"[ONNXRuntime][{label}] actual providers: {session.get_providers()}")
+
 # Handle both relative and absolute imports
 try:
     from .hash_helper import create_hash, validate_module_integrity
@@ -182,6 +196,7 @@ class ContentFilter:
                     providers=providers
                 )
                 self.sessions[model_name] = session
+                log_onnx_session(f'ContentFilter:{model_name}', providers, session)
                 print(f"[ContentFilter] ✓ Loaded {model_name}")
             except Exception as e:
                 print(f"[ContentFilter] Error loading {model_name}: {e}")
@@ -355,4 +370,3 @@ def blur_frame(frame: np.ndarray, blur_amount: int = 99) -> np.ndarray:
     blurred = cv2.GaussianBlur(frame, (blur_amount, blur_amount), 0)
     
     return blurred
-

@@ -9,6 +9,7 @@ import numpy as np
 import onnxruntime as ort
 from numpy.typing import NDArray
 
+from ..ort_utils import log_onnx_session
 from ..utils import VisionFrame, get_model_path, ensure_model_exists
 from .constants import MODEL_URLS, MODEL_CONFIGS
 
@@ -40,6 +41,7 @@ class FaceOccluder:
             # Create ONNX session
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
             self.model_session = ort.InferenceSession(model_path, providers=providers)
+            log_onnx_session(f'FaceOccluder:{self.model_name}', providers, self.model_session)
             
             # print(f"[FaceOccluder] Model {self.model_name} loaded, running on: {self.model_session.get_providers()[0]}")
             return True
@@ -95,7 +97,6 @@ def get_face_occluder(model_name: str = 'xseg_1') -> Optional[FaceOccluder]:
     if model_name not in _occluder_instances:
         _occluder_instances[model_name] = FaceOccluder(model_name)
     return _occluder_instances[model_name]
-
 
 
 

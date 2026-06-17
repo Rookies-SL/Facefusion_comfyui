@@ -11,6 +11,7 @@ import onnx
 from onnx import numpy_helper
 from numpy.typing import NDArray
 
+from ..ort_utils import log_onnx_session
 from ..utils import VisionFrame, Face, get_model_path, ensure_model_exists, implode_pixel_boost, explode_pixel_boost
 from .constants import MODEL_URLS, MODEL_CONFIGS, WARP_TEMPLATES, FACE_MASK_AREA_SET, FACE_MASK_REGION_SET
 
@@ -49,6 +50,7 @@ class LocalFaceSwapper:
             # Create ONNX session
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
             self.model_session = ort.InferenceSession(model_path, providers=providers)
+            log_onnx_session(f'LocalFaceSwapper:{self.model_name}', providers, self.model_session)
             
             # Load model_initializer for inswapper models
             model_type = self.model_config.get('type')
@@ -67,9 +69,11 @@ class LocalFaceSwapper:
                     converter_url = MODEL_URLS.get(converter_name)
                     if converter_url and ensure_model_exists(f'{converter_name}.onnx', converter_url):
                         self.embedding_converter_session = ort.InferenceSession(converter_path, providers=providers)
+                        log_onnx_session(f'EmbeddingConverter:{converter_name}', providers, self.embedding_converter_session)
                         print(f"[LocalFaceSwapper] Loaded embedding converter: {converter_name}")
                 else:
                     self.embedding_converter_session = ort.InferenceSession(converter_path, providers=providers)
+                    log_onnx_session(f'EmbeddingConverter:{converter_name}', providers, self.embedding_converter_session)
                     print(f"[LocalFaceSwapper] Loaded embedding converter: {converter_name}")
             
             # print(f"[LocalFaceSwapper] Model {self.model_name} loaded successfully")
@@ -587,4 +591,3 @@ def get_local_swapper(model_name: str = 'hyperswap_1c_256') -> LocalFaceSwapper:
     if _swapper_instance is None or _swapper_instance.model_name != model_name:
         _swapper_instance = LocalFaceSwapper(model_name)
     return _swapper_instance
-
