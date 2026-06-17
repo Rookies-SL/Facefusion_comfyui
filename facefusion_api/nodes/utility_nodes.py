@@ -110,6 +110,13 @@ class FaceSwapApplier:
 						'max': 100,
 						'step': 1
 					}
+				),
+				'enable_nsfw_check':
+				(
+					'BOOLEAN',
+					{
+						'default': True
+					}
 				)
 			}
 		}
@@ -129,7 +136,8 @@ class FaceSwapApplier:
 		face_occluder_model: str,
 		face_parser_model: str,
 		face_mask_blur: float,
-		face_index: int
+		face_index: int,
+		enable_nsfw_check: bool = True
 	) -> Tuple[Tensor, Dict]:
 		"""Apply face swap to specific detected face - smart batch handling."""
 		try:
@@ -166,7 +174,8 @@ class FaceSwapApplier:
 						pixel_boost, 
 						face_mask_blur,
 						face_occluder_model,
-						face_parser_model
+						face_parser_model,
+						enable_nsfw_check=enable_nsfw_check
 					)
 					output_images.append(swapped)
 				swapped_image = torch.cat(output_images, dim=0)
@@ -180,7 +189,8 @@ class FaceSwapApplier:
 					pixel_boost, 
 					face_mask_blur,
 					face_occluder_model,
-					face_parser_model
+					face_parser_model,
+					enable_nsfw_check=enable_nsfw_check
 				)
 			
 			print(f"Applied face swap to face {face_index}")

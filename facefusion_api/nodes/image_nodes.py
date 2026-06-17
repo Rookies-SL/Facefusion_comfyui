@@ -46,6 +46,13 @@ class SwapFaceImage:
 					{
 						'default': 'scrfd'
 					}
+				),
+				'enable_nsfw_check':
+				(
+					'BOOLEAN',
+					{
+						'default': True
+					}
 				)
 			}
 		}
@@ -55,7 +62,7 @@ class SwapFaceImage:
 	CATEGORY = 'FaceFusion API'
 
 	@staticmethod
-	def process(source_images : Tensor, target_image : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str) -> Tuple[Tensor]:
+	def process(source_images : Tensor, target_image : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, enable_nsfw_check: bool = True) -> Tuple[Tensor]:
 		# Smart batch processing - handle any input format
 		# Use first source image (or average multiple sources in future)
 		if source_images.dim() == 4 and source_images.shape[0] > 1:
@@ -70,18 +77,18 @@ class SwapFaceImage:
 			output_images = []
 			for i in range(target_image.shape[0]):
 				single_target = target_image[i:i+1]
-				swapped = SwapFaceImage.swap_face(source_image, single_target, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model)
+				swapped = SwapFaceImage.swap_face(source_image, single_target, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model, enable_nsfw_check=enable_nsfw_check)
 				output_images.append(swapped)
 			# Stack all results back into batch
 			output_tensor = torch.cat(output_images, dim=0)
 		else:
 			# Single image processing
-			output_tensor = SwapFaceImage.swap_face(source_image, target_image, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model)
+			output_tensor = SwapFaceImage.swap_face(source_image, target_image, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model, enable_nsfw_check=enable_nsfw_check)
 		
 		return (output_tensor,)
 
 	@staticmethod
-	def swap_face(source_tensor : Tensor, target_tensor : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, pixel_boost: str = '512x512', face_mask_blur: float = 0.3, face_occluder_model: Optional[str] = None, face_parser_model: Optional[str] = None, face_selector_mode: str = 'one', face_position: int = 0, sort_order: str = 'large-small', score_threshold: float = 0.3, face_detector_model: str = 'scrfd', face_mask_types: Optional[list] = None, face_mask_areas: Optional[list] = None, face_mask_regions: Optional[list] = None, face_mask_padding: tuple = (0, 0, 0, 0)) -> Tensor:
+	def swap_face(source_tensor : Tensor, target_tensor : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, pixel_boost: str = '512x512', face_mask_blur: float = 0.3, face_occluder_model: Optional[str] = None, face_parser_model: Optional[str] = None, face_selector_mode: str = 'one', face_position: int = 0, sort_order: str = 'large-small', score_threshold: float = 0.3, face_detector_model: str = 'scrfd', face_mask_types: Optional[list] = None, face_mask_areas: Optional[list] = None, face_mask_regions: Optional[list] = None, face_mask_padding: tuple = (0, 0, 0, 0), enable_nsfw_check: bool = True) -> Tensor:
 		# Check if using local inference
 		if api_token == '-1':
 			# print("[SwapFaceImage] Using local inference")
@@ -90,15 +97,16 @@ class SwapFaceImage:
 				source_cv2 = tensor_to_cv2(source_tensor)
 				target_cv2 = tensor_to_cv2(target_tensor)
 				
-				# NSFW content detection
-				is_source_nsfw = analyse_frame(source_cv2)
-				is_target_nsfw = analyse_frame(target_cv2)
-				
-				if is_source_nsfw or is_target_nsfw:
-					print("[ContentFilter] NSFW content detected - returning blurred output")
-					# Return blurred version of target
-					blurred = blur_frame(target_cv2)
-					return cv2_to_tensor(blurred)
+				if enable_nsfw_check and CONTENT_FILTER_AVAILABLE:
+					# NSFW content detection
+					is_source_nsfw = analyse_frame(source_cv2)
+					is_target_nsfw = analyse_frame(target_cv2)
+
+					if is_source_nsfw or is_target_nsfw:
+						print("[ContentFilter] NSFW content detected - returning blurred output")
+						# Return blurred version of target
+						blurred = blur_frame(target_cv2)
+						return cv2_to_tensor(blurred)
 				
 				# Perform local face swap
 				result_cv2 = swap_faces_local(
@@ -325,6 +333,13 @@ class AdvancedSwapFaceImage:
 						'default': '0,0,0,0',
 						'multiline': False
 					}
+				),
+				'enable_nsfw_check':
+				(
+					'BOOLEAN',
+					{
+						'default': True
+					}
 				)
 			},
 			'optional':
@@ -369,6 +384,7 @@ class AdvancedSwapFaceImage:
 		face_mask_areas: str = 'upper-face,lower-face,mouth',
 		face_mask_regions: str = 'skin,nose,mouth,upper-lip,lower-lip',
 		face_mask_padding: str = '0,0,0,0',
+		enable_nsfw_check: bool = True,
 		reference_image: Optional[Tensor] = None,
 		reference_face_distance: float = 0.6
 	) -> Tuple[Tensor]:
@@ -428,7 +444,8 @@ class AdvancedSwapFaceImage:
 					face_mask_types,
 					mask_areas,
 					mask_regions,
-					padding
+					padding,
+					enable_nsfw_check=enable_nsfw_check
 				)
 				output_images.append(swapped)
 			
@@ -453,7 +470,8 @@ class AdvancedSwapFaceImage:
 				face_mask_types,
 				mask_areas,
 				mask_regions,
-				padding
+				padding,
+				enable_nsfw_check=enable_nsfw_check
 			)
 		
 		return (output_tensor,)

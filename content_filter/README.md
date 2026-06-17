@@ -18,6 +18,7 @@ This module implements NSFW content detection for FaceFusion ComfyUI nodes.
 - **NSFW Detected**: Returns a heavily blurred version of the target image
 - **Safe Content**: Processes normally
 - Detection runs automatically on both source and target images in all swapper nodes
+- Set `enable_nsfw_check` to `false` on swapper nodes to skip detection in local mode
 
 ## Models
 
@@ -51,7 +52,7 @@ The content filter is automatically integrated into all face swapping nodes:
 - `AdvancedSwapFaceVideo`
 - `FaceSwapApplier`
 
-No additional configuration is required.
+No additional configuration is required unless you disable it with the node-level `enable_nsfw_check` switch.
 
 ## Model Storage
 
@@ -66,7 +67,6 @@ On first run, the filter will download:
 - `nsfw_3.onnx` + `nsfw_3.hash`
 
 Total download size: ~50MB
-
 
 
 

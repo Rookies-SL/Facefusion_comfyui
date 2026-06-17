@@ -52,6 +52,11 @@ First run downloads models (~200MB), then everything runs locally.
 - `-1` = Local inference (default) ✅ No internet required
 - `your_token` = API mode (requires internet)
 
+### enable_nsfw_check
+- `true` = Run NSFW detection before local face swapping (default)
+- `false` = Skip NSFW detection and process normally
+- Applies to local mode (`api_token: -1`) for image, video, advanced swap, and face applier nodes
+
 ### face_swapper_model
 **13 models available** - All auto-download on first use:
 - `hyperswap_1c_256` ⭐ Recommended - best quality/speed

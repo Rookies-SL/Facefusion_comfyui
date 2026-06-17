@@ -56,6 +56,13 @@ class SwapFaceVideo:
 						'min': 1,
 						'max': 32
 					}
+				),
+				'enable_nsfw_check':
+				(
+					'BOOLEAN',
+					{
+						'default': True
+					}
 				)
 			}
 		}
@@ -65,7 +72,7 @@ class SwapFaceVideo:
 	CATEGORY = 'FaceFusion API'
 
 	@staticmethod
-	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int) -> Tuple[VideoFromComponents]:
+	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int, enable_nsfw_check: bool = True) -> Tuple[VideoFromComponents]:
 		try:
 			# Handle multiple source images by taking the first one
 			if source_images.dim() == 4 and source_images.shape[0] > 1:
@@ -90,7 +97,7 @@ class SwapFaceVideo:
 					raise
 			
 			# Check source image for NSFW content (only if using local inference)
-			if api_token == '-1' and CONTENT_FILTER_AVAILABLE:
+			if api_token == '-1' and enable_nsfw_check and CONTENT_FILTER_AVAILABLE:
 				source_cv2 = tensor_to_cv2(source_image)
 				if analyse_frame(source_cv2):
 					print("[ContentFilter] NSFW source detected in video - returning blurred video")
@@ -110,7 +117,7 @@ class SwapFaceVideo:
 					return (VideoFromComponents(output_video_components),)
 			
 			# Sample check for NSFW in target video (check first, middle, last frame)
-			if api_token == '-1' and CONTENT_FILTER_AVAILABLE and len(video_components.images) > 0:
+			if api_token == '-1' and enable_nsfw_check and CONTENT_FILTER_AVAILABLE and len(video_components.images) > 0:
 				sample_indices = [0, len(video_components.images) // 2, len(video_components.images) - 1]
 				nsfw_detected = False
 				
@@ -145,7 +152,8 @@ class SwapFaceVideo:
 				source_image,
 				api_token = api_token,
 				face_swapper_model = face_swapper_model,
-				face_detector_model = face_detector_model
+				face_detector_model = face_detector_model,
+				enable_nsfw_check = enable_nsfw_check
 			)
 
 			with ThreadPoolExecutor(max_workers = max_workers) as executor:
@@ -346,6 +354,13 @@ class AdvancedSwapFaceVideo:
 						'min': 1,
 						'max': 32
 					}
+				),
+				'enable_nsfw_check':
+				(
+					'BOOLEAN',
+					{
+						'default': True
+					}
 				)
 			},
 			'optional':
@@ -391,6 +406,7 @@ class AdvancedSwapFaceVideo:
 		face_mask_regions: str = 'skin,nose,mouth,upper-lip,lower-lip',
 		face_mask_padding: str = '0,0,0,0',
 		max_workers: int = 16,
+		enable_nsfw_check: bool = True,
 		reference_image: Optional[Tensor] = None,
 		reference_face_distance: float = 0.6
 	) -> Tuple[VideoFromComponents]:
@@ -442,7 +458,7 @@ class AdvancedSwapFaceVideo:
 					raise
 			
 			# Check source image for NSFW content (only if using local inference)
-			if api_token == '-1' and CONTENT_FILTER_AVAILABLE:
+			if api_token == '-1' and enable_nsfw_check and CONTENT_FILTER_AVAILABLE:
 				source_cv2 = tensor_to_cv2(source_image)
 				if analyse_frame(source_cv2):
 					print("[ContentFilter] NSFW source detected in video - returning blurred video")
@@ -461,7 +477,7 @@ class AdvancedSwapFaceVideo:
 					return (VideoFromComponents(output_video_components),)
 			
 			# Sample check for NSFW in target video (check first, middle, last frame)
-			if api_token == '-1' and CONTENT_FILTER_AVAILABLE and len(video_components.images) > 0:
+			if api_token == '-1' and enable_nsfw_check and CONTENT_FILTER_AVAILABLE and len(video_components.images) > 0:
 				sample_indices = [0, len(video_components.images) // 2, len(video_components.images) - 1]
 				nsfw_detected = False
 				
@@ -508,7 +524,8 @@ class AdvancedSwapFaceVideo:
 				face_mask_types = face_mask_types,
 				face_mask_areas = mask_areas,
 				face_mask_regions = mask_regions,
-				face_mask_padding = padding
+				face_mask_padding = padding,
+				enable_nsfw_check = enable_nsfw_check
 			)
 
 			with ThreadPoolExecutor(max_workers = max_workers) as executor:
