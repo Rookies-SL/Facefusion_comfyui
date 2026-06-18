@@ -50,13 +50,6 @@ class SwapFaceVideo:
 						'default': 'scrfd'
 					}
 				),
-				'affine_mode':
-				(
-					['partial', 'full'],
-					{
-						'default': 'partial'
-					}
-				),
 				'max_workers':
 				(
 					'INT',
@@ -88,7 +81,7 @@ class SwapFaceVideo:
 	CATEGORY = 'FaceFusion API'
 
 	@staticmethod
-	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int = 4, enable_nsfw_check: bool = True, affine_mode: str = 'partial', pose_debug: bool = False) -> Tuple[VideoFromComponents]:
+	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int = 4, enable_nsfw_check: bool = True, pose_debug: bool = False) -> Tuple[VideoFromComponents]:
 		try:
 			# Handle multiple source images by taking the first one
 			if source_images.dim() == 4 and source_images.shape[0] > 1:
@@ -193,7 +186,6 @@ class SwapFaceVideo:
 				face_swapper_model = face_swapper_model,
 				face_detector_model = face_detector_model,
 				enable_nsfw_check = frame_enable_nsfw_check,
-				affine_mode = affine_mode,
 				source_face = source_face,
 				source_cv2 = source_cv2
 			)
@@ -282,13 +274,6 @@ class AdvancedSwapFaceVideo:
 					['256x256', '512x512', '768x768', '1024x1024'],
 					{
 						'default': '512x512'
-					}
-				),
-				'affine_mode':
-				(
-					['partial', 'full'],
-					{
-						'default': 'partial'
 					}
 				),
 				'face_occluder_model':
@@ -470,7 +455,6 @@ class AdvancedSwapFaceVideo:
 			enable_nsfw_check: bool = True,
 			reference_image: Optional[Tensor] = None,
 			reference_face_distance: float = 0.6,
-			affine_mode: str = 'partial',
 			pose_debug: bool = False
 	) -> Tuple[VideoFromComponents]:
 		"""Process video face swapping with advanced selection."""
@@ -612,7 +596,6 @@ class AdvancedSwapFaceVideo:
 				face_mask_regions = mask_regions,
 				face_mask_padding = padding,
 				enable_nsfw_check = frame_enable_nsfw_check,
-				affine_mode = affine_mode,
 				source_face = source_face,
 				source_cv2 = source_cv2
 			)

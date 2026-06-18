@@ -26,8 +26,7 @@ def swap_faces_local(
     face_mask_regions: Optional[List[str]] = None,
     face_mask_padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
     source_face: Optional[Face] = None,
-    target_face: Optional[Face] = None,
-    affine_mode: str = 'partial'
+    target_face: Optional[Face] = None
 ) -> VisionFrame:
     """
     Swap faces locally using ONNX models.
@@ -51,7 +50,6 @@ def swap_faces_local(
         face_mask_padding: Padding for box mask (top, right, bottom, left)
         source_face: Precomputed source face for video/batch paths to avoid repeated source detection
         target_face: Precomputed tracked target face for video paths to avoid frame-to-frame selection jumps
-        affine_mode: Face alignment mode ('partial' or 'full')
     
     Returns:
         Image with swapped faces
@@ -102,8 +100,7 @@ def swap_faces_local(
             result = swapper.swap_face(
                 source_face, target_face, result, pixel_boost, face_mask_blur, 
                 occluder, parser, source_image,
-                face_mask_types, face_mask_areas, face_mask_regions, face_mask_padding,
-                affine_mode=affine_mode
+                face_mask_types, face_mask_areas, face_mask_regions, face_mask_padding
             )
     else:
         # Swap one face
@@ -113,8 +110,7 @@ def swap_faces_local(
         result = swapper.swap_face(
             source_face, target_face, result, pixel_boost, face_mask_blur,
             occluder, parser, source_image,
-            face_mask_types, face_mask_areas, face_mask_regions, face_mask_padding,
-            affine_mode=affine_mode
+            face_mask_types, face_mask_areas, face_mask_regions, face_mask_padding
         )
     
     # print("[LocalSwap] Face swap completed")

@@ -98,8 +98,7 @@ class LocalFaceSwapper:
         face_mask_types: Optional[List[str]] = None,
         face_mask_areas: Optional[List[str]] = None,
         face_mask_regions: Optional[List[str]] = None,
-        face_mask_padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
-        affine_mode: str = 'partial'
+        face_mask_padding: Tuple[int, int, int, int] = (0, 0, 0, 0)
     ) -> VisionFrame:
         """Swap a single face in the target image with multi-mask support."""
         if self.model_session is None:
@@ -132,8 +131,7 @@ class LocalFaceSwapper:
                 target_image,
                 target_face['landmarks'],
                 model_template,
-                pixel_boost_size,
-                affine_mode=affine_mode
+                pixel_boost_size
             )
             
             # Collect all crop masks based on face_mask_types (before swapping, just like facefusion-master)
@@ -212,8 +210,7 @@ class LocalFaceSwapper:
         image: VisionFrame,
         landmarks: NDArray,
         template_name: str,
-        size: Tuple[int, int],
-        affine_mode: str = 'partial'
+        size: Tuple[int, int]
     ) -> Tuple[VisionFrame, NDArray]:
         """Warp face using landmarks to standard template."""
         template = WARP_TEMPLATES.get(template_name)
@@ -224,22 +221,11 @@ class LocalFaceSwapper:
         template_scaled = template * np.array([size[0], size[1]])
         
         landmarks = landmarks.astype(np.float32)
-        affine_matrix = None
-        if affine_mode == 'full':
-            affine_matrix = cv2.estimateAffine2D(
-                landmarks,
-                template_scaled,
-                method=cv2.LMEDS
-            )[0]
-        elif affine_mode != 'partial':
-            print(f"[LocalFaceSwapper] Warning: Unknown affine_mode '{affine_mode}', using partial")
-
-        if affine_matrix is None:
-            affine_matrix = cv2.estimateAffinePartial2D(
-                landmarks,
-                template_scaled,
-                method=cv2.LMEDS
-            )[0]
+        affine_matrix = cv2.estimateAffinePartial2D(
+            landmarks,
+            template_scaled,
+            method=cv2.LMEDS
+        )[0]
         
         # Warp image
         warped = cv2.warpAffine(

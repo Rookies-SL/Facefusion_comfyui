@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import sys
 import types
 from pathlib import Path
@@ -104,19 +105,23 @@ class SwapLocalOptimizationTest(TestCase):
 		self.assertEqual(detected_frames, [])
 		self.assertIs(self.dummy_swapper.calls[0][0][1], tracked_target_face)
 
-	def test_passes_affine_mode_to_local_swapper(self):
+	def test_swap_faces_local_does_not_accept_or_pass_affine_mode(self):
 		source_frame = Frame('source')
 		target_frame = Frame('target')
 		cached_source_face = {'id': 'cached-source'}
 		tracked_target_face = {'id': 'tracked-target'}
 
+		self.assertNotIn(
+			'affine_mode',
+			inspect.signature(self.swap_local.swap_faces_local).parameters
+		)
+
 		result = self.swap_local.swap_faces_local(
 			source_frame,
 			target_frame,
 			source_face=cached_source_face,
-			target_face=tracked_target_face,
-			affine_mode='full'
+			target_face=tracked_target_face
 		)
 
 		self.assertEqual(result.name, 'swapped')
-		self.assertEqual(self.dummy_swapper.calls[0][1]['affine_mode'], 'full')
+		self.assertNotIn('affine_mode', self.dummy_swapper.calls[0][1])

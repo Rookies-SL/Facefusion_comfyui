@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import sys
 import types
 from pathlib import Path
@@ -42,48 +43,23 @@ def install_swapper_stubs():
     sys.modules['onnx'] = onnx_module
 
 
-class AffineModeTest(TestCase):
+class PartialAffineOnlyTest(TestCase):
     def setUp(self):
         install_swapper_stubs()
         sys.modules.pop('facefusion_api.models.swapper', None)
         self.swapper_module = importlib.import_module('facefusion_api.models.swapper')
 
-    def test_full_affine_mode_uses_full_affine_estimator(self):
-        swapper = self.swapper_module.LocalFaceSwapper()
-        landmarks = np.array([
-            [10.0, 10.0],
-            [20.0, 10.0],
-            [15.0, 15.0],
-            [12.0, 22.0],
-            [18.0, 22.0],
-        ], dtype=np.float32)
-        image = np.zeros((32, 32, 3), dtype=np.uint8)
-        matrix = np.array([[1.0, 0.1, 2.0], [0.2, 1.0, 3.0]], dtype=np.float32)
-        calls = []
-
-        def estimate_full(source, target, method=None):
-            calls.append(('full', source.copy(), target.copy(), method))
-            return matrix, None
-
-        def estimate_partial(*_args, **_kwargs):
-            raise AssertionError('partial estimator should not be used')
-
-        self.swapper_module.cv2.estimateAffine2D = estimate_full
-        self.swapper_module.cv2.estimateAffinePartial2D = estimate_partial
-        self.swapper_module.cv2.warpAffine = lambda *_args, **_kwargs: image
-
-        _crop, affine_matrix = swapper._warp_face(
-            image,
-            landmarks,
-            'arcface_128',
-            (128, 128),
-            affine_mode='full'
+    def test_public_swapper_signatures_do_not_accept_affine_mode(self):
+        self.assertNotIn(
+            'affine_mode',
+            inspect.signature(self.swapper_module.LocalFaceSwapper.swap_face).parameters
+        )
+        self.assertNotIn(
+            'affine_mode',
+            inspect.signature(self.swapper_module.LocalFaceSwapper._warp_face).parameters
         )
 
-        self.assertEqual(calls[0][0], 'full')
-        np.testing.assert_allclose(affine_matrix, matrix)
-
-    def test_full_affine_mode_falls_back_to_partial_when_estimation_fails(self):
+    def test_warp_face_uses_partial_affine_estimator(self):
         swapper = self.swapper_module.LocalFaceSwapper()
         landmarks = np.array([
             [10.0, 10.0],
@@ -96,12 +72,13 @@ class AffineModeTest(TestCase):
         matrix = np.array([[1.0, 0.0, 2.0], [0.0, 1.0, 3.0]], dtype=np.float32)
         calls = []
 
-        self.swapper_module.cv2.estimateAffine2D = lambda *_args, **_kwargs: (None, None)
-
         def estimate_partial(source, target, method=None):
             calls.append(('partial', source.copy(), target.copy(), method))
             return matrix, None
 
+        self.swapper_module.cv2.estimateAffine2D = lambda *_args, **_kwargs: (
+            (_ for _ in ()).throw(AssertionError('full affine estimator should not be used'))
+        )
         self.swapper_module.cv2.estimateAffinePartial2D = estimate_partial
         self.swapper_module.cv2.warpAffine = lambda *_args, **_kwargs: image
 
@@ -109,8 +86,7 @@ class AffineModeTest(TestCase):
             image,
             landmarks,
             'arcface_128',
-            (128, 128),
-            affine_mode='full'
+            (128, 128)
         )
 
         self.assertEqual(calls[0][0], 'partial')

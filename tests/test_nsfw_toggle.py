@@ -104,13 +104,12 @@ class NsfwToggleTest(TestCase):
 			'target',
 			'-1',
 			'hyperswap_1c_256',
-			enable_nsfw_check=False,
-			affine_mode='full'
+			enable_nsfw_check=False
 		)
 
 		self.assertEqual(result, 'tensor:swapped-cv2')
 		self.assertEqual(len(calls), 1)
-		self.assertEqual(calls[0]['affine_mode'], 'full')
+		self.assertNotIn('affine_mode', calls[0])
 
 	def test_video_precheck_disables_repeated_frame_nsfw_analysis(self) -> None:
 		install_stub_modules()
@@ -279,14 +278,13 @@ class NsfwToggleTest(TestCase):
 			0,
 			'large-small',
 			0.3,
-			affine_mode='full',
 			max_workers=1,
 			enable_nsfw_check=False
 		)
 
 		self.assertEqual(len(swap_calls), 2)
 		self.assertTrue(all(call['target_face'] is None for call in swap_calls))
-		self.assertTrue(all(call['affine_mode'] == 'full' for call in swap_calls))
+		self.assertTrue(all('affine_mode' not in call for call in swap_calls))
 
 	def test_video_nodes_default_to_conservative_worker_count(self) -> None:
 		install_stub_modules()
@@ -312,20 +310,26 @@ class NsfwToggleTest(TestCase):
 			4
 		)
 
-	def test_advanced_video_exposes_affine_and_pose_debug_controls(self) -> None:
+	def test_nodes_keep_pose_debug_but_remove_affine_control(self) -> None:
 		install_stub_modules()
 		sys.modules.pop('facefusion_api.nodes.base', None)
 		sys.modules.pop('facefusion_api.nodes.image_nodes', None)
 		sys.modules.pop('facefusion_api.nodes.video_nodes', None)
+		image_nodes = importlib.import_module('facefusion_api.nodes.image_nodes')
 		video_nodes = importlib.import_module('facefusion_api.nodes.video_nodes')
 
-		required = video_nodes.AdvancedSwapFaceVideo.INPUT_TYPES()['required']
+		for node_class in (
+			image_nodes.SwapFaceImage,
+			image_nodes.AdvancedSwapFaceImage,
+			video_nodes.SwapFaceVideo,
+			video_nodes.AdvancedSwapFaceVideo,
+		):
+			self.assertNotIn('affine_mode', node_class.INPUT_TYPES()['required'])
+			self.assertNotIn('affine_mode', inspect.signature(node_class.process).parameters)
 
-		self.assertEqual(required['affine_mode'][1]['default'], 'partial')
-		self.assertEqual(required['pose_debug'][1]['default'], False)
 		self.assertEqual(
-			inspect.signature(video_nodes.AdvancedSwapFaceVideo.process).parameters['affine_mode'].default,
-			'partial'
+			video_nodes.AdvancedSwapFaceVideo.INPUT_TYPES()['required']['pose_debug'][1]['default'],
+			False
 		)
 		self.assertEqual(
 			inspect.signature(video_nodes.AdvancedSwapFaceVideo.process).parameters['pose_debug'].default,
