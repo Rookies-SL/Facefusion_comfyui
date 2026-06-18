@@ -22,6 +22,21 @@ def face(face_id, bbox, landmarks=None):
 	return result
 
 
+def landmarks_with_pose(pitch_ratio, yaw_offset=0.0, eye_distance=80.0, roll_offset=0.0):
+	left_eye = [100.0, 100.0]
+	right_eye = [100.0 + eye_distance, 100.0 + roll_offset]
+	eye_center_x = (left_eye[0] + right_eye[0]) * 0.5
+	eye_center_y = (left_eye[1] + right_eye[1]) * 0.5
+	vertical_span = 80.0
+	nose = [
+		eye_center_x + yaw_offset * eye_distance,
+		eye_center_y + pitch_ratio * vertical_span,
+	]
+	left_mouth = [eye_center_x - 25.0, eye_center_y + vertical_span]
+	right_mouth = [eye_center_x + 25.0, eye_center_y + vertical_span]
+	return [left_eye, right_eye, nose, left_mouth, right_mouth]
+
+
 class FaceTrackingTest(TestCase):
 	def test_keeps_same_face_by_bbox_overlap_instead_of_position(self):
 		previous_face = face('left', [10, 10, 50, 50])
@@ -100,5 +115,53 @@ class FaceTrackingTest(TestCase):
 		)
 
 		selected = select_tracked_face([unstable_candidate], previous_face, face_position=0)
+
+		self.assertIs(selected, previous_face)
+
+	def test_reuses_previous_face_when_pitch_jumps(self):
+		previous_face = face(
+			'tracked',
+			[520.0, 60.0, 700.0, 240.0],
+			landmarks_with_pose(-0.50)
+		)
+		unstable_candidate = face(
+			'unstable-pitch',
+			[522.0, 62.0, 702.0, 242.0],
+			landmarks_with_pose(-0.20)
+		)
+
+		selected = select_tracked_face([unstable_candidate], previous_face, face_position=0)
+
+		self.assertIs(selected, previous_face)
+
+	def test_accepts_gradual_pitch_change(self):
+		previous_face = face(
+			'tracked',
+			[520.0, 60.0, 700.0, 240.0],
+			landmarks_with_pose(-0.50)
+		)
+		stable_candidate = face(
+			'stable-pitch',
+			[522.0, 62.0, 702.0, 242.0],
+			landmarks_with_pose(-0.36)
+		)
+
+		selected = select_tracked_face([stable_candidate], previous_face, face_position=0)
+
+		self.assertIs(selected, stable_candidate)
+
+	def test_reuses_previous_face_when_pitch_is_extreme(self):
+		previous_face = face(
+			'tracked',
+			[520.0, 60.0, 700.0, 240.0],
+			landmarks_with_pose(-0.65)
+		)
+		extreme_candidate = face(
+			'extreme-pitch',
+			[522.0, 62.0, 702.0, 242.0],
+			landmarks_with_pose(-0.84)
+		)
+
+		selected = select_tracked_face([extreme_candidate], previous_face, face_position=0)
 
 		self.assertIs(selected, previous_face)

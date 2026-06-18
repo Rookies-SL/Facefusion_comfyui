@@ -12,6 +12,8 @@ MAX_CENTER_DISTANCE_SCALE = 0.75
 MIN_EYE_DISTANCE = 35.0
 MIN_EYE_DISTANCE_RATIO = 0.55
 MAX_EYE_DISTANCE_RATIO = 1.65
+MAX_ABS_PITCH_RATIO = 0.80
+MAX_PITCH_DELTA = 0.25
 MAX_YAW_OFFSET = 0.75
 MAX_YAW_DELTA = 0.30
 MAX_ROLL_DELTA = 20.0
@@ -59,6 +61,13 @@ def _is_stable_candidate(previous_face: Face, candidate_face: Face) -> bool:
 
     eye_distance_ratio = candidate_eye_distance / max(previous_eye_distance, 1e-6)
     if eye_distance_ratio < MIN_EYE_DISTANCE_RATIO or eye_distance_ratio > MAX_EYE_DISTANCE_RATIO:
+        return False
+
+    if abs(candidate_pose['pitch_ratio']) > MAX_ABS_PITCH_RATIO:
+        return False
+
+    pitch_delta = abs(candidate_pose['pitch_ratio'] - previous_pose['pitch_ratio'])
+    if pitch_delta > MAX_PITCH_DELTA:
         return False
 
     if abs(candidate_pose['yaw_offset']) > MAX_YAW_OFFSET:
