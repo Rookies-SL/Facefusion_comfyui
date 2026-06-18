@@ -15,8 +15,11 @@ sys.modules['facefusion_api'] = package
 select_tracked_face = importlib.import_module('facefusion_api.face_tracking').select_tracked_face
 
 
-def face(face_id, bbox):
-	return {'id': face_id, 'bbox': bbox}
+def face(face_id, bbox, landmarks=None):
+	result = {'id': face_id, 'bbox': bbox}
+	if landmarks is not None:
+		result['landmarks'] = landmarks
+	return result
 
 
 class FaceTrackingTest(TestCase):
@@ -43,3 +46,59 @@ class FaceTrackingTest(TestCase):
 
 	def test_returns_none_when_no_faces_are_detected(self):
 		self.assertIsNone(select_tracked_face([], {'bbox': [0, 0, 1, 1]}, face_position=0))
+
+	def test_reuses_previous_face_when_candidate_jumps_to_wrong_region(self):
+		previous_face = face(
+			'tracked',
+			[554.2, 76.7, 742.3, 251.0],
+			[
+				[610.0, 129.0],
+				[668.0, 130.0],
+				[638.0, 154.0],
+				[618.0, 194.0],
+				[658.0, 195.0],
+			]
+		)
+		bad_candidate = face(
+			'bad-detection',
+			[574.0, 387.3, 962.5, 684.4],
+			[
+				[670.0, 500.0],
+				[681.0, 511.0],
+				[676.0, 526.0],
+				[700.0, 570.0],
+				[730.0, 585.0],
+			]
+		)
+
+		selected = select_tracked_face([bad_candidate], previous_face, face_position=0)
+
+		self.assertIs(selected, previous_face)
+
+	def test_reuses_previous_face_when_landmark_pose_jumps(self):
+		previous_face = face(
+			'tracked',
+			[543.1, 7.1, 715.2, 191.2],
+			[
+				[590.0, 70.0],
+				[663.0, 74.0],
+				[620.0, 91.0],
+				[596.0, 137.0],
+				[650.0, 141.0],
+			]
+		)
+		unstable_candidate = face(
+			'unstable',
+			[517.8, 51.9, 705.5, 221.8],
+			[
+				[575.0, 95.0],
+				[640.0, 102.5],
+				[581.0, 111.0],
+				[590.0, 167.0],
+				[646.0, 173.0],
+			]
+		)
+
+		selected = select_tracked_face([unstable_candidate], previous_face, face_position=0)
+
+		self.assertIs(selected, previous_face)
