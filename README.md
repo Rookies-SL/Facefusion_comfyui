@@ -195,6 +195,7 @@ All image swapper nodes **automatically detect and handle**:
 - Pixel Boost: `512x512`
 - Max Workers: `4` default; increase carefully if GPU memory and ONNX runtime stay stable
 - Source face detection is cached per video run; keep one clear source face for best speed
+- Target faces are tracked by bounding box across frames; `face_position` selects the initial face
 
 ---
 

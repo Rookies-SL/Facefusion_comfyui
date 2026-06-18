@@ -160,6 +160,130 @@ class NsfwToggleTest(TestCase):
 		self.assertEqual(len(swap_calls), 3)
 		self.assertTrue(all(call['enable_nsfw_check'] is False for call in swap_calls))
 
+	def test_video_tracks_target_face_across_frames_before_swapping(self) -> None:
+		install_stub_modules()
+		sys.modules.pop('facefusion_api.nodes.base', None)
+		sys.modules.pop('facefusion_api.nodes.image_nodes', None)
+		sys.modules.pop('facefusion_api.nodes.video_nodes', None)
+		video_nodes = importlib.import_module('facefusion_api.nodes.video_nodes')
+		swap_calls = []
+		detect_calls = []
+
+		class FakeVideoComponents:
+			def __init__(self, images, audio=None, frame_rate=30):
+				self.images = images
+				self.audio = audio
+				self.frame_rate = frame_rate
+
+		class FakeVideo:
+			def __init__(self, components):
+				self.components = components
+
+			def get_components(self):
+				return self.components
+
+		def fake_swap_face(source_tensor, target_tensor, **kwargs):
+			swap_calls.append(kwargs)
+			return torch.zeros((1, 2, 2, 3))
+
+		left_1 = {'id': 'left', 'bbox': [10, 10, 50, 50]}
+		left_2 = {'id': 'left', 'bbox': [12, 10, 52, 50]}
+		left_3 = {'id': 'left', 'bbox': [14, 10, 54, 50]}
+		right_1 = {'id': 'right', 'bbox': [100, 10, 140, 50]}
+		right_2 = {'id': 'right', 'bbox': [102, 10, 142, 50]}
+		right_3 = {'id': 'right', 'bbox': [104, 10, 144, 50]}
+		detection_results = [
+			[{'id': 'source', 'bbox': [0, 0, 40, 40]}],
+			[left_1, right_1],
+			[right_2, left_2],
+			[right_3, left_3],
+		]
+
+		def fake_detect_faces(*_args, **_kwargs):
+			detect_calls.append(True)
+			return detection_results.pop(0)
+
+		video_nodes.VideoComponents = FakeVideoComponents
+		video_nodes.VideoFromComponents = FakeVideo
+		video_nodes.tensor_to_cv2 = lambda tensor: tensor
+		video_nodes.analyse_frame = lambda frame: False
+		video_nodes.detect_faces = fake_detect_faces
+		video_nodes.SwapFaceImage.swap_face = staticmethod(fake_swap_face)
+
+		frames = torch.zeros((3, 2, 2, 3))
+		source = torch.zeros((1, 2, 2, 3))
+		target_video = FakeVideo(FakeVideoComponents(frames))
+
+		video_nodes.SwapFaceVideo.process(
+			source,
+			target_video,
+			'-1',
+			'hyperswap_1c_256',
+			'scrfd',
+			1,
+			False
+		)
+
+		self.assertEqual(len(detect_calls), 4)
+		self.assertEqual([call['target_face']['id'] for call in swap_calls], ['left', 'left', 'left'])
+
+	def test_advanced_video_many_mode_does_not_force_single_tracked_target(self) -> None:
+		install_stub_modules()
+		sys.modules.pop('facefusion_api.nodes.base', None)
+		sys.modules.pop('facefusion_api.nodes.image_nodes', None)
+		sys.modules.pop('facefusion_api.nodes.video_nodes', None)
+		video_nodes = importlib.import_module('facefusion_api.nodes.video_nodes')
+		swap_calls = []
+
+		class FakeVideoComponents:
+			def __init__(self, images, audio=None, frame_rate=30):
+				self.images = images
+				self.audio = audio
+				self.frame_rate = frame_rate
+
+		class FakeVideo:
+			def __init__(self, components):
+				self.components = components
+
+			def get_components(self):
+				return self.components
+
+		def fake_swap_face(source_tensor, target_tensor, **kwargs):
+			swap_calls.append(kwargs)
+			return torch.zeros((1, 2, 2, 3))
+
+		video_nodes.VideoComponents = FakeVideoComponents
+		video_nodes.VideoFromComponents = FakeVideo
+		video_nodes.tensor_to_cv2 = lambda tensor: tensor
+		video_nodes.analyse_frame = lambda frame: False
+		video_nodes.detect_faces = lambda *_args, **_kwargs: [{'id': 'source', 'bbox': [0, 0, 40, 40]}]
+		video_nodes.SwapFaceImage.swap_face = staticmethod(fake_swap_face)
+
+		frames = torch.zeros((2, 2, 2, 3))
+		source = torch.zeros((1, 2, 2, 3))
+		target_video = FakeVideo(FakeVideoComponents(frames))
+
+		video_nodes.AdvancedSwapFaceVideo().process(
+			source,
+			target_video,
+			'-1',
+			'hyperswap_1c_256',
+			'scrfd',
+			'512x512',
+			'none',
+			'none',
+			0.3,
+			'many',
+			0,
+			'large-small',
+			0.3,
+			max_workers=1,
+			enable_nsfw_check=False
+		)
+
+		self.assertEqual(len(swap_calls), 2)
+		self.assertTrue(all(call['target_face'] is None for call in swap_calls))
+
 	def test_video_nodes_default_to_conservative_worker_count(self) -> None:
 		install_stub_modules()
 		sys.modules.pop('facefusion_api.nodes.base', None)

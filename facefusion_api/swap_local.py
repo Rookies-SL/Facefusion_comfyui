@@ -25,7 +25,8 @@ def swap_faces_local(
     face_mask_areas: Optional[List[str]] = None,
     face_mask_regions: Optional[List[str]] = None,
     face_mask_padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
-    source_face: Optional[Face] = None
+    source_face: Optional[Face] = None,
+    target_face: Optional[Face] = None
 ) -> VisionFrame:
     """
     Swap faces locally using ONNX models.
@@ -48,6 +49,7 @@ def swap_faces_local(
         face_mask_regions: List of face regions for region mask ['skin', 'nose', 'mouth', etc.]
         face_mask_padding: Padding for box mask (top, right, bottom, left)
         source_face: Precomputed source face for video/batch paths to avoid repeated source detection
+        target_face: Precomputed tracked target face for video paths to avoid frame-to-frame selection jumps
     
     Returns:
         Image with swapped faces
@@ -65,11 +67,13 @@ def swap_faces_local(
             return target_image
         source_face = source_faces[min(face_position, len(source_faces) - 1)]
 
-    target_faces = detect_faces(target_image, score_threshold, sort_order, face_detector_model)
-    
-    if not target_faces:
-        # print("[LocalSwap] No faces detected in target image")
-        return target_image
+    target_faces = None
+    if target_face is None:
+        target_faces = detect_faces(target_image, score_threshold, sort_order, face_detector_model)
+
+        if not target_faces:
+            # print("[LocalSwap] No faces detected in target image")
+            return target_image
 
     # print(f"[LocalSwap] Using source face at position {face_position}")
     
@@ -89,6 +93,8 @@ def swap_faces_local(
     
     if face_selector_mode == 'many':
         # Swap all faces
+        if target_faces is None:
+            target_faces = [target_face]
         for i, target_face in enumerate(target_faces):
             # print(f"[LocalSwap] Swapping face {i+1}/{len(target_faces)}")
             result = swapper.swap_face(
@@ -98,7 +104,8 @@ def swap_faces_local(
             )
     else:
         # Swap one face
-        target_face = target_faces[min(face_position, len(target_faces) - 1)]
+        if target_face is None:
+            target_face = target_faces[min(face_position, len(target_faces) - 1)]
         # print(f"[LocalSwap] Swapping target face at position {face_position}")
         result = swapper.swap_face(
             source_face, target_face, result, pixel_boost, face_mask_blur,

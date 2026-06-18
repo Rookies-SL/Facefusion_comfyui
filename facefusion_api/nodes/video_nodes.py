@@ -2,6 +2,7 @@
 Video Nodes for ComfyUI.
 """
 from .base import *
+from ..face_tracking import select_tracked_face
 from .image_nodes import SwapFaceImage
 
 class SwapFaceVideo:
@@ -153,6 +154,18 @@ class SwapFaceVideo:
 				source_faces = detect_faces(source_cv2, 0.3, 'large-small', face_detector_model)
 				if source_faces:
 					source_face = source_faces[0]
+
+			tracked_target_faces = None
+			if api_token == '-1':
+				tracked_target_faces = []
+				previous_target_face = None
+				for frame_tensor in video_components.images:
+					frame_cv2 = tensor_to_cv2(frame_tensor.unsqueeze(0))
+					frame_faces = detect_faces(frame_cv2, 0.3, 'large-small', face_detector_model)
+					target_face = select_tracked_face(frame_faces, previous_target_face, 0)
+					tracked_target_faces.append(target_face)
+					if target_face is not None:
+						previous_target_face = target_face
 			
 			output_tensors = []
 			frame_enable_nsfw_check = False if api_token == '-1' else enable_nsfw_check
@@ -168,8 +181,13 @@ class SwapFaceVideo:
 				source_cv2 = source_cv2
 			)
 
+			def swap_frame(index_and_tensor):
+				frame_index, frame_tensor = index_and_tensor
+				target_face = tracked_target_faces[frame_index] if tracked_target_faces is not None else None
+				return swap_face(frame_tensor, target_face=target_face)
+
 			with ThreadPoolExecutor(max_workers = max_workers) as executor:
-				for temp_tensor in executor.map(swap_face, video_components.images):
+				for temp_tensor in executor.map(swap_frame, enumerate(video_components.images)):
 					temp_tensor = temp_tensor.squeeze(0)[..., :3]
 					output_tensors.append(temp_tensor)
 
@@ -525,6 +543,18 @@ class AdvancedSwapFaceVideo:
 				source_faces = detect_faces(source_cv2, score_threshold, sort_order, face_detector_model)
 				if source_faces:
 					source_face = source_faces[min(face_position, len(source_faces) - 1)]
+
+			tracked_target_faces = None
+			if api_token == '-1' and face_selector_mode != 'many':
+				tracked_target_faces = []
+				previous_target_face = None
+				for frame_tensor in video_components.images:
+					frame_cv2 = tensor_to_cv2(frame_tensor.unsqueeze(0))
+					frame_faces = detect_faces(frame_cv2, score_threshold, sort_order, face_detector_model)
+					target_face = select_tracked_face(frame_faces, previous_target_face, face_position)
+					tracked_target_faces.append(target_face)
+					if target_face is not None:
+						previous_target_face = target_face
 			
 			output_tensors = []
 			frame_enable_nsfw_check = False if api_token == '-1' else enable_nsfw_check
@@ -552,8 +582,13 @@ class AdvancedSwapFaceVideo:
 				source_cv2 = source_cv2
 			)
 
+			def swap_frame(index_and_tensor):
+				frame_index, frame_tensor = index_and_tensor
+				target_face = tracked_target_faces[frame_index] if tracked_target_faces is not None else None
+				return swap_face(frame_tensor, target_face=target_face)
+
 			with ThreadPoolExecutor(max_workers = max_workers) as executor:
-				for temp_tensor in executor.map(swap_face, video_components.images):
+				for temp_tensor in executor.map(swap_frame, enumerate(video_components.images)):
 					temp_tensor = temp_tensor.squeeze(0)[..., :3]
 					output_tensors.append(temp_tensor)
 

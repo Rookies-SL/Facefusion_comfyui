@@ -79,3 +79,27 @@ class SwapLocalOptimizationTest(TestCase):
 		self.assertEqual(result.name, 'swapped')
 		self.assertEqual(detected_frames, ['target'])
 		self.assertIs(self.dummy_swapper.calls[0][0], cached_source_face)
+
+	def test_uses_precomputed_target_face_without_detecting_target_again(self):
+		source_frame = Frame('source')
+		target_frame = Frame('target')
+		cached_source_face = {'id': 'cached-source'}
+		tracked_target_face = {'id': 'tracked-target'}
+		detected_frames = []
+
+		def detect_faces(frame, *_args, **_kwargs):
+			detected_frames.append(frame.name)
+			return []
+
+		self.swap_local.detect_faces = detect_faces
+
+		result = self.swap_local.swap_faces_local(
+			source_frame,
+			target_frame,
+			source_face=cached_source_face,
+			target_face=tracked_target_face
+		)
+
+		self.assertEqual(result.name, 'swapped')
+		self.assertEqual(detected_frames, [])
+		self.assertIs(self.dummy_swapper.calls[0][1], tracked_target_face)
