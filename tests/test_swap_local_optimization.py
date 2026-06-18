@@ -20,8 +20,8 @@ class DummySwapper:
 	def __init__(self):
 		self.calls = []
 
-	def swap_face(self, *args):
-		self.calls.append(args)
+	def swap_face(self, *args, **kwargs):
+		self.calls.append((args, kwargs))
 		return Frame('swapped')
 
 
@@ -78,7 +78,7 @@ class SwapLocalOptimizationTest(TestCase):
 
 		self.assertEqual(result.name, 'swapped')
 		self.assertEqual(detected_frames, ['target'])
-		self.assertIs(self.dummy_swapper.calls[0][0], cached_source_face)
+		self.assertIs(self.dummy_swapper.calls[0][0][0], cached_source_face)
 
 	def test_uses_precomputed_target_face_without_detecting_target_again(self):
 		source_frame = Frame('source')
@@ -102,4 +102,21 @@ class SwapLocalOptimizationTest(TestCase):
 
 		self.assertEqual(result.name, 'swapped')
 		self.assertEqual(detected_frames, [])
-		self.assertIs(self.dummy_swapper.calls[0][1], tracked_target_face)
+		self.assertIs(self.dummy_swapper.calls[0][0][1], tracked_target_face)
+
+	def test_passes_affine_mode_to_local_swapper(self):
+		source_frame = Frame('source')
+		target_frame = Frame('target')
+		cached_source_face = {'id': 'cached-source'}
+		tracked_target_face = {'id': 'tracked-target'}
+
+		result = self.swap_local.swap_faces_local(
+			source_frame,
+			target_frame,
+			source_face=cached_source_face,
+			target_face=tracked_target_face,
+			affine_mode='full'
+		)
+
+		self.assertEqual(result.name, 'swapped')
+		self.assertEqual(self.dummy_swapper.calls[0][1]['affine_mode'], 'full')

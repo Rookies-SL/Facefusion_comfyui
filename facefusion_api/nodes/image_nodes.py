@@ -10,7 +10,7 @@ class SwapFaceImage:
 		{
 			'required':
 			{
-				'source_images': (IO.IMAGE,),  # Changed to plural to support batches
+				'source_images': (IO.IMAGE,),
 				'target_image': (IO.IMAGE,),
 				'api_token':
 				(
@@ -47,6 +47,13 @@ class SwapFaceImage:
 						'default': 'scrfd'
 					}
 				),
+				'affine_mode':
+				(
+					['partial', 'full'],
+					{
+						'default': 'partial'
+					}
+				),
 				'enable_nsfw_check':
 				(
 					'BOOLEAN',
@@ -62,7 +69,7 @@ class SwapFaceImage:
 	CATEGORY = 'FaceFusion API'
 
 	@staticmethod
-	def process(source_images : Tensor, target_image : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, enable_nsfw_check: bool = True) -> Tuple[Tensor]:
+	def process(source_images : Tensor, target_image : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, enable_nsfw_check: bool = True, affine_mode: str = 'partial') -> Tuple[Tensor]:
 		# Smart batch processing - handle any input format
 		# Use first source image (or average multiple sources in future)
 		if source_images.dim() == 4 and source_images.shape[0] > 1:
@@ -77,18 +84,18 @@ class SwapFaceImage:
 			output_images = []
 			for i in range(target_image.shape[0]):
 				single_target = target_image[i:i+1]
-				swapped = SwapFaceImage.swap_face(source_image, single_target, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model, enable_nsfw_check=enable_nsfw_check)
+				swapped = SwapFaceImage.swap_face(source_image, single_target, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model, enable_nsfw_check=enable_nsfw_check, affine_mode=affine_mode)
 				output_images.append(swapped)
 			# Stack all results back into batch
 			output_tensor = torch.cat(output_images, dim=0)
 		else:
 			# Single image processing
-			output_tensor = SwapFaceImage.swap_face(source_image, target_image, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model, enable_nsfw_check=enable_nsfw_check)
+			output_tensor = SwapFaceImage.swap_face(source_image, target_image, api_token, face_swapper_model, '512x512', 0.3, face_detector_model=face_detector_model, enable_nsfw_check=enable_nsfw_check, affine_mode=affine_mode)
 		
 		return (output_tensor,)
 
 	@staticmethod
-	def swap_face(source_tensor : Tensor, target_tensor : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, pixel_boost: str = '512x512', face_mask_blur: float = 0.3, face_occluder_model: Optional[str] = None, face_parser_model: Optional[str] = None, face_selector_mode: str = 'one', face_position: int = 0, sort_order: str = 'large-small', score_threshold: float = 0.3, face_detector_model: str = 'scrfd', face_mask_types: Optional[list] = None, face_mask_areas: Optional[list] = None, face_mask_regions: Optional[list] = None, face_mask_padding: tuple = (0, 0, 0, 0), enable_nsfw_check: bool = True, source_face: Optional[Dict[str, Any]] = None, target_face: Optional[Dict[str, Any]] = None, source_cv2: Optional[Any] = None) -> Tensor:
+	def swap_face(source_tensor : Tensor, target_tensor : Tensor, api_token : str, face_swapper_model : FaceSwapperModel, pixel_boost: str = '512x512', face_mask_blur: float = 0.3, face_occluder_model: Optional[str] = None, face_parser_model: Optional[str] = None, face_selector_mode: str = 'one', face_position: int = 0, sort_order: str = 'large-small', score_threshold: float = 0.3, face_detector_model: str = 'scrfd', face_mask_types: Optional[list] = None, face_mask_areas: Optional[list] = None, face_mask_regions: Optional[list] = None, face_mask_padding: tuple = (0, 0, 0, 0), enable_nsfw_check: bool = True, source_face: Optional[Dict[str, Any]] = None, target_face: Optional[Dict[str, Any]] = None, source_cv2: Optional[Any] = None, affine_mode: str = 'partial') -> Tensor:
 		# Check if using local inference
 		if api_token == '-1':
 			# print("[SwapFaceImage] Using local inference")
@@ -128,7 +135,8 @@ class SwapFaceImage:
 					face_mask_regions=face_mask_regions,
 					face_mask_padding=face_mask_padding,
 					source_face=source_face,
-					target_face=target_face
+					target_face=target_face,
+					affine_mode=affine_mode
 				)
 				
 				# Convert back to tensor
@@ -228,20 +236,27 @@ class AdvancedSwapFaceImage:
 						'default': '512x512'
 					}
 				),
-			'face_occluder_model':
-			(
-				['none', 'xseg_1', 'xseg_2', 'xseg_3'],
-				{
-					'default': 'xseg_1'
-				}
-			),
-			'face_parser_model':
-			(
-				['none', 'bisenet_resnet_18', 'bisenet_resnet_34'],
-				{
-					'default': 'bisenet_resnet_34'
-				}
-			),
+				'affine_mode':
+				(
+					['partial', 'full'],
+					{
+						'default': 'partial'
+					}
+				),
+				'face_occluder_model':
+				(
+					['none', 'xseg_1', 'xseg_2', 'xseg_3'],
+					{
+						'default': 'xseg_1'
+					}
+				),
+				'face_parser_model':
+				(
+					['none', 'bisenet_resnet_18', 'bisenet_resnet_34'],
+					{
+						'default': 'bisenet_resnet_34'
+					}
+				),
 				'face_mask_blur':
 				(
 					'FLOAT',
@@ -389,7 +404,8 @@ class AdvancedSwapFaceImage:
 		face_mask_padding: str = '0,0,0,0',
 		enable_nsfw_check: bool = True,
 		reference_image: Optional[Tensor] = None,
-		reference_face_distance: float = 0.6
+		reference_face_distance: float = 0.6,
+		affine_mode: str = 'partial'
 	) -> Tuple[Tensor]:
 		"""Process face swapping with advanced selection - smart batch handling."""
 		# Build face_mask_types list based on boolean options
@@ -448,7 +464,8 @@ class AdvancedSwapFaceImage:
 					mask_areas,
 					mask_regions,
 					padding,
-					enable_nsfw_check=enable_nsfw_check
+					enable_nsfw_check=enable_nsfw_check,
+					affine_mode=affine_mode
 				)
 				output_images.append(swapped)
 			
@@ -474,7 +491,8 @@ class AdvancedSwapFaceImage:
 				mask_areas,
 				mask_regions,
 				padding,
-				enable_nsfw_check=enable_nsfw_check
+				enable_nsfw_check=enable_nsfw_check,
+				affine_mode=affine_mode
 			)
 		
 		return (output_tensor,)

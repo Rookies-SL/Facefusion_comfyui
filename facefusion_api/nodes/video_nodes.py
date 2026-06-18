@@ -3,6 +3,7 @@ Video Nodes for ComfyUI.
 """
 from .base import *
 from ..face_tracking import select_tracked_face
+from ..face_pose import log_face_pose
 from .image_nodes import SwapFaceImage
 
 class SwapFaceVideo:
@@ -49,6 +50,13 @@ class SwapFaceVideo:
 						'default': 'scrfd'
 					}
 				),
+				'affine_mode':
+				(
+					['partial', 'full'],
+					{
+						'default': 'partial'
+					}
+				),
 				'max_workers':
 				(
 					'INT',
@@ -64,6 +72,13 @@ class SwapFaceVideo:
 					{
 						'default': True
 					}
+				),
+				'pose_debug':
+				(
+					'BOOLEAN',
+					{
+						'default': False
+					}
 				)
 			}
 		}
@@ -73,7 +88,7 @@ class SwapFaceVideo:
 	CATEGORY = 'FaceFusion API'
 
 	@staticmethod
-	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int = 4, enable_nsfw_check: bool = True) -> Tuple[VideoFromComponents]:
+	def process(source_images : Tensor, target_video : VideoFromComponents, api_token : str, face_swapper_model : FaceSwapperModel, face_detector_model: str, max_workers : int = 4, enable_nsfw_check: bool = True, affine_mode: str = 'partial', pose_debug: bool = False) -> Tuple[VideoFromComponents]:
 		try:
 			# Handle multiple source images by taking the first one
 			if source_images.dim() == 4 and source_images.shape[0] > 1:
@@ -159,10 +174,11 @@ class SwapFaceVideo:
 			if api_token == '-1':
 				tracked_target_faces = []
 				previous_target_face = None
-				for frame_tensor in video_components.images:
+				for frame_index, frame_tensor in enumerate(video_components.images):
 					frame_cv2 = tensor_to_cv2(frame_tensor.unsqueeze(0))
 					frame_faces = detect_faces(frame_cv2, 0.3, 'large-small', face_detector_model)
 					target_face = select_tracked_face(frame_faces, previous_target_face, 0)
+					log_face_pose('SwapFaceVideo', frame_index, target_face, pose_debug)
 					tracked_target_faces.append(target_face)
 					if target_face is not None:
 						previous_target_face = target_face
@@ -177,6 +193,7 @@ class SwapFaceVideo:
 				face_swapper_model = face_swapper_model,
 				face_detector_model = face_detector_model,
 				enable_nsfw_check = frame_enable_nsfw_check,
+				affine_mode = affine_mode,
 				source_face = source_face,
 				source_cv2 = source_cv2
 			)
@@ -267,20 +284,27 @@ class AdvancedSwapFaceVideo:
 						'default': '512x512'
 					}
 				),
-			'face_occluder_model':
-			(
-				['none', 'xseg_1', 'xseg_2', 'xseg_3'],
-				{
-					'default': 'xseg_1'
-				}
-			),
-			'face_parser_model':
-			(
-				['none', 'bisenet_resnet_18', 'bisenet_resnet_34'],
-				{
-					'default': 'bisenet_resnet_34'
-				}
-			),
+				'affine_mode':
+				(
+					['partial', 'full'],
+					{
+						'default': 'partial'
+					}
+				),
+				'face_occluder_model':
+				(
+					['none', 'xseg_1', 'xseg_2', 'xseg_3'],
+					{
+						'default': 'xseg_1'
+					}
+				),
+				'face_parser_model':
+				(
+					['none', 'bisenet_resnet_18', 'bisenet_resnet_34'],
+					{
+						'default': 'bisenet_resnet_34'
+					}
+				),
 				'face_mask_blur':
 				(
 					'FLOAT',
@@ -391,8 +415,15 @@ class AdvancedSwapFaceVideo:
 					{
 						'default': True
 					}
-				)
-			},
+				),
+				'pose_debug':
+					(
+						'BOOLEAN',
+						{
+							'default': False
+						}
+					)
+				},
 			'optional':
 			{
 				'reference_image': (IO.IMAGE,),
@@ -435,10 +466,12 @@ class AdvancedSwapFaceVideo:
 		face_mask_areas: str = 'upper-face,lower-face,mouth',
 		face_mask_regions: str = 'skin,nose,mouth,upper-lip,lower-lip',
 		face_mask_padding: str = '0,0,0,0',
-		max_workers: int = 4,
-		enable_nsfw_check: bool = True,
-		reference_image: Optional[Tensor] = None,
-		reference_face_distance: float = 0.6
+			max_workers: int = 4,
+			enable_nsfw_check: bool = True,
+			reference_image: Optional[Tensor] = None,
+			reference_face_distance: float = 0.6,
+			affine_mode: str = 'partial',
+			pose_debug: bool = False
 	) -> Tuple[VideoFromComponents]:
 		"""Process video face swapping with advanced selection."""
 		# Build face_mask_types list based on boolean options
@@ -548,10 +581,11 @@ class AdvancedSwapFaceVideo:
 			if api_token == '-1' and face_selector_mode != 'many':
 				tracked_target_faces = []
 				previous_target_face = None
-				for frame_tensor in video_components.images:
+				for frame_index, frame_tensor in enumerate(video_components.images):
 					frame_cv2 = tensor_to_cv2(frame_tensor.unsqueeze(0))
 					frame_faces = detect_faces(frame_cv2, score_threshold, sort_order, face_detector_model)
 					target_face = select_tracked_face(frame_faces, previous_target_face, face_position)
+					log_face_pose('AdvancedSwapFaceVideo', frame_index, target_face, pose_debug)
 					tracked_target_faces.append(target_face)
 					if target_face is not None:
 						previous_target_face = target_face
@@ -578,6 +612,7 @@ class AdvancedSwapFaceVideo:
 				face_mask_regions = mask_regions,
 				face_mask_padding = padding,
 				enable_nsfw_check = frame_enable_nsfw_check,
+				affine_mode = affine_mode,
 				source_face = source_face,
 				source_cv2 = source_cv2
 			)
